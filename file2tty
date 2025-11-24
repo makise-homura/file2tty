@@ -1,0 +1,52 @@
+#!/bin/sh
+
+DEBUG=no
+
+do_killall()
+{
+    [ -f "/run/file2tty.pid" ] && /bin/kill "`/bin/cat "/run/file2tty.pid"`"
+    [ -f "/run/file2tty_inotify.pid" ] && /bin/kill "`/bin/cat "/run/file2tty_inotify.pid"`"
+    /bin/rm -f "/run/file2tty.pid" "/run/file2tty_inotify.pid" "/run/file2tty.in" "/run/file2tty.out"
+}
+
+if [ ! -x "/usr/bin/inotifywait" ]
+then
+    echo "Can't find inotifywait binary, check if it is installed" 1>&2
+    exit 2
+fi
+
+if [ -z "$1" ]
+then
+    [ "$DEBUG" = "yes" ] && /bin/touch "/run/file2tty.log"
+    /bin/mkdir -p /run
+    trap do_killall INT EXIT
+    "$0" --input &
+    echo "$!" > "/run/file2tty.pid"
+    "$0" --output
+else
+    if [ "$1" = "--input" ]
+    then
+        while true
+        do
+            /bin/touch "/run/file2tty.in"
+            /usr/bin/inotifywait -qqe close_write "/run/file2tty.in" &
+            echo "$!" > "/run/file2tty_inotify.pid"
+            wait "`/bin/cat "/run/file2tty_inotify.pid"`"
+            /bin/cat "/run/file2tty.in" > "/dev/kmsg"
+            [ "$DEBUG" = "yes" ] && echo "debug write: `/bin/cat "/run/file2tty.in"`" >> "/run/file2tty.log"
+        done
+    else
+        if [ "$1" = "--output" ]
+        then
+            while true
+            do
+                read data < "/dev/ttyS0"
+                [ "$DEBUG" = "yes" ] && echo "debug read: $data" >> "/run/file2tty.log"
+                echo "$data" > "/run/file2tty.out"
+            done
+        else
+            echo "Incorrect parameters, user must run this without any parameters" 1>&2
+            exit 1
+        fi
+    fi
+fi
