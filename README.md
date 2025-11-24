@@ -6,7 +6,7 @@ Install `inotifywait` package prior to use it.
 
 ### Installation
 
-Put the script into `/usr/libexec`.
+Put the script into `/usr/libexec`, chmod it to `755`.
 
 Edit `/etc/inittab`: modify the line starting with `ttyS0` as following:
 
